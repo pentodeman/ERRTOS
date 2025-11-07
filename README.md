@@ -12,3 +12,5 @@
   - (Optional) Logging power consumption data to the SD card (this will likely be replaced by a web interface)
 - System functional diagram:
 <img src="Embedded_Project_Hardware.drawio.svg" />
+
+SVG file: /Embedded_Project_Hardware.drawio.svg
