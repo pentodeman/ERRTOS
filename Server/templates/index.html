@@ -12,12 +12,11 @@
     <div class="max-w-6xl mx-auto">
         <h1 class="text-2xl font-bold mb-4">Power Consumption Dashboard</h1>
 
-        <!-- Alert Banner -->
         <div id="alert-banner" class="hidden bg-red-500 text-white p-4 mb-4 rounded">
             Alert: High usage! Total power exceeds <span id="threshold-value"></span> W.
         </div>
 
-        <!-- Configurable Alerts and Auto Control -->
+        <!-- Alerts and Automation -->
         <div class="mb-4">
             <form id="threshold-form" class="flex items-center">
                 <label class="mr-2">Alert Threshold (W):</label>
@@ -27,7 +26,7 @@
             <button id="auto-toggle" class="mt-2 bg-green-500 text-white p-1 rounded">Enable Auto Control</button>
         </div>
 
-        <!-- Current Readings -->
+        <!-- Displaying up to date readings -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
             <div class="bg-white p-4 rounded shadow">
                 <h2 class="font-bold">Total Power</h2>
@@ -51,7 +50,7 @@
             </div>
         </div>
 
-        <!-- Graphs -->
+        <!-- Graphs of data over time -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div class="bg-white p-4 rounded shadow">
                 <h2 class="font-bold">Total Power Over Time</h2>
@@ -67,7 +66,7 @@
             </div>
         </div>
 
-        <!-- Export Button -->
+        <!-- Here we export our data fields to an excel spreadsheet -->
         <a href="/export_csv" class="bg-green-500 text-white p-2 rounded">Export Usage Data to CSV</a>
     </div>
 
@@ -83,11 +82,11 @@
                 options: { scales: { x: { type: 'time', time: { unit: 'minute' } } } }
             });
             o1Chart = new Chart(document.getElementById('o1-chart'), {
-                type: 'line', data: { labels, datasets: [{ label: 'Outlet 1 Power (W)', data: history.map(d => d.outlet1.power), borderColor: 'green' }] },
+                type: 'line', data: { labels, datasets: [{ label: 'Outlet 1 Current (A)', data: history.map(d => d.outlet1.current), borderColor: 'green' }] },
                 options: { scales: { x: { type: 'time', time: { unit: 'minute' } } } }
             });
             o2Chart = new Chart(document.getElementById('o2-chart'), {
-                type: 'line', data: { labels, datasets: [{ label: 'Outlet 2 Power (W)', data: history.map(d => d.outlet2.power), borderColor: 'red' }] },
+                type: 'line', data: { labels, datasets: [{ label: 'Outlet 2 Current (A)', data: history.map(d => d.outlet2.current), borderColor: 'red' }] },
                 options: { scales: { x: { type: 'time', time: { unit: 'minute' } } } }
             });
             if (history.length > 0) updateReadings(history[0]);
