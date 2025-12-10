@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Power Monitoring GUI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+</head>
+<body class="bg-gray-100 p-4">
+    <div class="max-w-6xl mx-auto">
+        <h1 class="text-2xl font-bold mb-4">Power Consumption Dashboard</h1>
+
+        <!-- Alert Banner -->
+        <div id="alert-banner" class="hidden bg-red-500 text-white p-4 mb-4 rounded">
+            Alert: High usage! Total power exceeds <span id="threshold-value"></span> W.
+        </div>
+
+        <!-- Configurable Alerts and Auto Control -->
+        <div class="mb-4">
+            <form id="threshold-form" class="flex items-center">
+                <label class="mr-2">Alert Threshold (W):</label>
+                <input type="number" id="threshold-input" value="400" class="border p-1 mr-2">
+                <button type="submit" class="bg-blue-500 text-white p-1 rounded">Set</button>
+            </form>
+            <button id="auto-toggle" class="mt-2 bg-green-500 text-white p-1 rounded">Enable Auto Control</button>
+        </div>
+
+        <!-- Current Readings -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+            <div class="bg-white p-4 rounded shadow">
+                <h2 class="font-bold">Total Power</h2>
+                <p id="total-power">Loading...</p>
+            </div>
+            <div class="bg-white p-4 rounded shadow">
+                <h2 class="font-bold">System Voltage</h2>
+                <p id="system-voltage">Loading...</p>
+            </div>
+            <div class="bg-white p-4 rounded shadow">
+                <h2 class="font-bold">Outlet 1</h2>
+                <p id="o1-power">Power: Loading...</p>
+                <p id="o1-current">Current: Loading...</p>
+                <button id="toggle-o1" class="bg-blue-500 text-white p-1 mt-2 rounded">Toggle Outlet 1</button>
+            </div>
+            <div class="bg-white p-4 rounded shadow">
+                <h2 class="font-bold">Outlet 2</h2>
+                <p id="o2-power">Power: Loading...</p>
+                <p id="o2-current">Current: Loading...</p>
+                <button id="toggle-o2" class="bg-blue-500 text-white p-1 mt-2 rounded">Toggle Outlet 2</button>
+            </div>
+        </div>
+
+        <!-- Graphs -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div class="bg-white p-4 rounded shadow">
+                <h2 class="font-bold">Total Power Over Time</h2>
+                <canvas id="total-chart"></canvas>
+            </div>
+            <div class="bg-white p-4 rounded shadow">
+                <h2 class="font-bold">Outlet 1 Power Over Time</h2>
+                <canvas id="o1-chart"></canvas>
+            </div>
+            <div class="bg-white p-4 rounded shadow">
+                <h2 class="font-bold">Outlet 2 Power Over Time</h2>
+                <canvas id="o2-chart"></canvas>
+            </div>
+        </div>
+
+        <!-- Export Button -->
+        <a href="/export_csv" class="bg-green-500 text-white p-2 rounded">Export Usage Data to CSV</a>
+    </div>
+
+    <script>
+        let totalChart, o1Chart, o2Chart;
+        const ws = new WebSocket(`ws://${location.host}/ws`);
+
+        async function init() {
+            const history = await fetch('/history').then(res => res.json());
+            const labels = history.map(d => d.timestamp);
+            totalChart = new Chart(document.getElementById('total-chart'), {
+                type: 'line', data: { labels, datasets: [{ label: 'Total Power (W)', data: history.map(d => d.total_power), borderColor: 'blue' }] },
+                options: { scales: { x: { type: 'time', time: { unit: 'minute' } } } }
+            });
+            o1Chart = new Chart(document.getElementById('o1-chart'), {
+                type: 'line', data: { labels, datasets: [{ label: 'Outlet 1 Power (W)', data: history.map(d => d.outlet1.power), borderColor: 'green' }] },
+                options: { scales: { x: { type: 'time', time: { unit: 'minute' } } } }
+            });
+            o2Chart = new Chart(document.getElementById('o2-chart'), {
+                type: 'line', data: { labels, datasets: [{ label: 'Outlet 2 Power (W)', data: history.map(d => d.outlet2.power), borderColor: 'red' }] },
+                options: { scales: { x: { type: 'time', time: { unit: 'minute' } } } }
+            });
+            if (history.length > 0) updateReadings(history[0]);
+        }
+
+        function updateReadings(data) {
+            document.getElementById('total-power').innerText = `${data.total_power} W`;
+            document.getElementById('system-voltage').innerText = `${data.outlet1.voltage} V`;  // Since voltage is shared
+            document.getElementById('o1-power').innerText = `Power: ${data.outlet1.power} W`;
+            document.getElementById('o1-current').innerText = `Current: ${data.outlet1.current} A`;
+            document.getElementById('o2-power').innerText = `Power: ${data.outlet2.power} W`;
+            document.getElementById('o2-current').innerText = `Current: ${data.outlet2.current} A`;
+            document.getElementById('toggle-o1').innerText = data.outlet1.state ? 'Turn Outlet 1 Off' : 'Turn Outlet 1 On';
+            document.getElementById('toggle-o2').innerText = data.outlet2.state ? 'Turn Outlet 2 Off' : 'Turn Outlet 2 On';
+        }
+
+        ws.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            if (data.alert_active !== undefined) {
+                document.getElementById('alert-banner').classList.toggle('hidden', !data.alert_active);
+                document.getElementById('threshold-value').innerText = data.threshold;
+                document.getElementById('threshold-input').value = data.threshold;
+            } else {
+                updateReadings(data);
+                totalChart.data.labels.push(data.timestamp);
+                totalChart.data.datasets[0].data.push(data.total_power);
+                o1Chart.data.labels.push(data.timestamp);
+                o1Chart.data.datasets[0].data.push(data.outlet1.power);
+                o2Chart.data.labels.push(data.timestamp);
+                o2Chart.data.datasets[0].data.push(data.outlet2.power);
+                totalChart.update();
+                o1Chart.update();
+                o2Chart.update();
+            }
+        };
+
+        document.getElementById('toggle-o1').onclick = () => fetch('/toggle/outlet1', { method: 'POST' });
+        document.getElementById('toggle-o2').onclick = () => fetch('/toggle/outlet2', { method: 'POST' });
+        document.getElementById('threshold-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const threshold = document.getElementById('threshold-input').value;
+            await fetch('/set_threshold', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({threshold}) });
+        };
+        document.getElementById('auto-toggle').onclick = async () => {
+            const res = await fetch('/toggle_auto', { method: 'POST' }).then(res => res.json());
+            document.getElementById('auto-toggle').innerText = res.enabled ? 'Disable Auto Control' : 'Enable Auto Control';
+            document.getElementById('auto-toggle').classList.toggle('bg-green-500', !res.enabled);
+            document.getElementById('auto-toggle').classList.toggle('bg-red-500', res.enabled);
+        };
+
+        init();
+    </script>
+</body>
+</html>

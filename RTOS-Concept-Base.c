@@ -10,11 +10,15 @@ typedef struct task {
 
 typedef struct _QueueUC {
     unsigned char buf[QSize];
+    unsigned char *head;
+    unsigned char *tail;
     unsigned char cnt;
 } QueueUC;
 
 void QueueInit (QueueUC *Q) {
     (*Q).cnt = 0;
+    (*Q).head = (*Q).buf;
+    (*Q).tail = (*Q).buf + QSize;
 }
 
 unsigned char QueueFull(QueueUC Q) {
@@ -25,23 +29,42 @@ unsigned char QueueEmpty(QueueUC Q) {
     return (Q.cnt == 0);
 }
 
-void QueuePrint(QueueUC Q) {
-    int i;
-    printf("Queue Contents: \n");
-    
-    for (i = 0; i < QSize; i++) {
-        printf("Item %d: %d\n", i, Q.buf[i]);
-    }
+unsigned char QueueHeadLeft(QueueUC Q) {
+    return (Q.head < Q.tail);
 }
 
+void QueuePrint(QueueUC Q) {
+    unsigned char i;
+    unsigned char j;
+    
+    printf("Queue Contents: \n");
+    
+    if (QueueHeadLeft(Q)) {
+        for (i = 0; i < QSize; i++) {
+            printf("Item %d: %d\n", i, Q.head[i]);
+        }
+    } else {
+        for (i = 0; i < QSize - (Q.head - Q.buf); i++) {
+            printf("Item %d: %d\n", i, Q.head[i]);
+        }
+        for (j = 0; j < Q.tail - Q.buf; j++) {
+            printf("Item %d: %d\n", i + j + 1, Q.buf[j]);
+        }
+    }
+}
 
 void QueuePush(QueueUC *Q, unsigned char item) {
     if (!QueueFull(*Q)) {
         DisableInterrupts();
-        (*Q).buf[(*Q).cnt] = item;
+        if ((*Q).tail - (*Q).buf == QSize) {
+            (*Q).tail = (*Q).buf;
+        } else {
+            (*Q).tail++;
+        }
+        (*(*Q).tail) = item;
         (*Q).cnt++;
         EnableInterrupts();
-    )
+    }
 }
 
 unsigned char QueuePop(QueueUC *Q) {
@@ -50,8 +73,18 @@ unsigned char QueuePop(QueueUC *Q) {
     
     if (!QueueEmpty(*Q)) {
         DisableInterrupts();
-        
-
+        item = (*(*Q).head);
+        (*Q).cnt--;
+        if (((*Q).head + 1) < &(*Q).buf[QSize]) {
+            (*Q).head++;
+        } else {
+            (*Q).head = (*Q).buf;
+        }
+        EnableInterrupts();
+    }
+    
+    return(item);
+}
 
 const unsigned int numTasks = 2;
 const unsigned long period = 100;
@@ -78,6 +111,8 @@ void TimerISR() {
     }
 }
 
+QueueUC TestQ;
+
 int main() {
     tasks[0].state = BL0;
     tasks[0].period = periodBlinkLED;
@@ -87,6 +122,21 @@ int main() {
     tasks[1].period = periodThreeLED;
     tasks[1].elapsedTime = tasks[1].period;
     tasks[1].Function = &ThreeLED;
+    
+    QueueInit(&TestQ);
+    QueuePush(&TestQ, 1);
+    QueuePush(&TestQ, 2);
+    QueuePrint(TestQ);
+    QueuePop(&TestQ);
+    QueuePush(&TestQ, 1);
+    QueuePush(&TestQ, 2);
+    QueuePush(&TestQ, 3);
+    QueuePrint(TestQ);
+    QueuePop(&TestQ);
+    QueuePrint(TestQ);
+    QueuePush(&TestQ, 4);
+    QueuePrint(TestQ);
+    printf("%d, %d, %d, %d", QueuePop(&TestQ), QueuePop(&TestQ), QueuePop(&TestQ), QueuePop(&TestQ));
     
     TimerSet(period);
     TimerOn();
