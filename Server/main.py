@@ -12,7 +12,7 @@ import time
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
-# SQLite DB setup
+# We are using SQLite to setup our Data Base
 conn = sqlite3.connect("power_data.db", check_same_thread=False)
 c = conn.cursor()
 c.execute('''CREATE TABLE IF NOT EXISTS readings
@@ -21,7 +21,7 @@ c.execute('''CREATE TABLE IF NOT EXISTS readings
               o2_power REAL, o2_voltage REAL, o2_current REAL, o2_state INTEGER)''')
 conn.commit()
 
-# In-memory state
+
 latest_data = {
     "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
     "total_power": 0.0,
@@ -29,9 +29,9 @@ latest_data = {
     "outlet2": {"power": 0.0, "voltage": 0.0, "current": 0.0, "state": False}
 }
 websockets = []
-desired_states = {"outlet1": True, "outlet2": True}  # Initial: both on
-alert_threshold = 400.0  # Default watts
-auto_control_enabled = False  # Default: manual only
+desired_states = {"outlet1": True, "outlet2": True}  # Both outlets start in the On state
+alert_threshold = 400.0  # This is our default Alert Threshold in Watts (W)
+auto_control_enabled = False  # Defaults to manual
 alert_active = False
 last_insert_time = 0
 
@@ -54,7 +54,7 @@ async def broadcast_alert():
 def maybe_insert_to_db():
     global last_insert_time
     now = time.time()
-    if now - last_insert_time > 1:  # Throttle to at most once per second
+    if now - last_insert_time > 1:  # We need to throttle at most once a second
         c.execute('''INSERT INTO readings VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                   (latest_data['timestamp'], latest_data['total_power'],
                    latest_data['outlet1']['power'], latest_data['outlet1']['voltage'], latest_data['outlet1']['current'], int(latest_data['outlet1']['state']),
@@ -66,8 +66,6 @@ def build_command_byte():
     active_cmd = 1  # Always set to 1 to indicate a valid command to apply
     o1_state = 1 if desired_states['outlet1'] else 0
     o2_state = 1 if desired_states['outlet2'] else 0 # 00 - neither 01 - o1 - 10 - o2 - 11 both
-    #value = active_cmd | (o1_state << 1) | (o2_state << 2)
-    #value = 96 + o1_state + (2 * o2_state)
     value = '`' if not (o1_state or o2_state) else 'a' if (o1_state and not o2_state) else 'b' if (o2_state and not o1_state) else 'c'
     return bytes(value, 'utf-8')
 
@@ -75,7 +73,7 @@ def build_command_byte():
 async def root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
-# Individual POST endpoints for raw values
+# Individual POST endpoints for our data
 @app.post("/total_power")
 async def update_total_power(request: Request):
     global alert_active
