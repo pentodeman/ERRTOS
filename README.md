@@ -1,7 +1,7 @@
 ## ECE 4380-001 Final Project: Group 26
-- Quinton Cook
 - Rexford Brittingham
 - Dominik Kuzniarz
+- Quinton Cook
 
 ## Hardware
 - Main system features:
